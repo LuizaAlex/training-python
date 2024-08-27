@@ -9,37 +9,36 @@ _LOG = get_logger('HelloWorld-handler')
 class HelloWorld(AbstractLambda):
 
     def validate_request(self, event) -> dict:
-           
-        path = event.get("path", "")
-        method = event.get("httpMethod", "")
-
-        if method == "GET" and path == "/hello":
-            return {}
-        else:
-            raise_error_response(
-                RESPONSE_BAD_REQUEST_CODE,
-                f"Bad request syntax or unsupported method. Request path: {path}. HTTP method: {method}"
-            )
-
+        # Pentru simplificare, considerăm că cererea este validă dacă calea și metoda sunt corecte
+        errors = {}
+        path = event.get('rawPath', '')
+        method = event.get('requestContext', {}).get('http', {}).get('method', '')
         
-    def handle_request(self, event, context):
-        """
-        Handles the incoming request after validation.
-        """
-        self.validate_request(event)  # Validarea cererii
+        if method not in ["GET"]:
+            errors["method"] = "Unsupported HTTP method"
+        if path not in ["/hello", "/"]:
+            errors["path"] = "Unsupported path"
+        
+        return errors
 
-        # Returnarea răspunsului OK pentru /hello
-        message = "Hello from Lambda"
-        return build_response({"message": message}, RESPONSE_OK_CODE)  
+    def handle_request(self, event, context):
+        path = event.get('rawPath', '/')
+        method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
+        
+        if path == "/hello" and method == "GET":
+            response = {
+                "statusCode": 200,
+                "message": "Hello from Lambda"
+            }
+        else:
+            response = {
+                "statusCode": 400,
+                "message": f"Bad request syntax or unsupported method. Request path: {path}. HTTP method: {method}"
+            }
+        
+        return build_response(content=response, code=response['statusCode'])
 
 HANDLER = HelloWorld()
 
-
 def lambda_handler(event, context):
-    try:
-        return HANDLER.lambda_handler(event=event, context=context)
-    except ApplicationException as e:
-        return {
-            'statusCode': e.code,
-            'body': e.content
-        }
+    return HANDLER.lambda_handler(event=event, context=context)
